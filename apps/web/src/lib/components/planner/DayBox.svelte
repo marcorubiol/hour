@@ -32,6 +32,9 @@
     /** The clash sentences this thing is in. */
     clashes?: string[];
     done?: boolean;
+    /** One line (ADR-249): the day opened in place in Month or Agenda,
+        where a full day has to sit beside its neighbours. */
+    compact?: boolean;
   }
   let {
     href,
@@ -44,6 +47,7 @@
     band = null,
     clashes = [],
     done = false,
+    compact = false,
   }: Props = $props();
 </script>
 
@@ -53,6 +57,7 @@
   class="dbox"
   class:dbox--show={band !== null}
   class:dbox--done={done}
+  class:dbox--compact={compact}
   data-testid="day-box"
 >
   {#if band}
@@ -167,6 +172,47 @@
     }
     .dbox__go {
       color: var(--text-muted);
+    }
+    /* ONE LINE (ADR-249): hour, mark, what · where. The band stays the head
+       of its box, flush to the edge; a clash still says itself underneath. */
+    .dbox--compact {
+      max-inline-size: none;
+      border-radius: var(--radius);
+    }
+    .dbox--compact .dbox__band {
+      padding: calc(var(--space-xs) * 0.75) var(--space-s);
+    }
+    .dbox--compact .dbox__in {
+      grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-s);
+      min-block-size: 2.5rem;
+    }
+    .dbox--compact .dbox__at {
+      font-size: var(--text-xs);
+    }
+    .dbox--compact .dbox__body {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dbox--compact .dbox__what {
+      display: inline-flex;
+      font-family: inherit;
+      font-size: var(--text-s);
+      line-height: 1.3;
+    }
+    .dbox--compact .dbox__sub {
+      font-size: var(--text-xs);
+    }
+    .dbox--compact .dbox__sub::before {
+      content: ' · ';
+    }
+    .dbox--compact .dbox__clash {
+      display: block;
+      white-space: normal;
+      font-size: var(--text-xs);
     }
   }
 </style>

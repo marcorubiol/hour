@@ -431,6 +431,9 @@ interface PlannerFeedInputs {
   teamWorkspaceIds: () => string[];
   /** The Day view's selected day — its notes band reads exactly one day. */
   selectedDay: () => string;
+  /** A day opened in place (a phone's Month or Agenda, ADR-249): its notes
+      are read as the Day view's are. */
+  dayOpen?: () => boolean;
   /** Viewer-tz day key for "today" — constant for the page's lifetime. */
   todayIso: string;
 }
@@ -551,7 +554,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const day = inputs.selectedDay();
     return {
       queryKey: ['planner-day-notes', day] as const,
-      enabled: inputs.view() === 'day',
+      enabled: inputs.view() === 'day' || Boolean(inputs.dayOpen?.()),
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
           return await fetchJSON<{ items: NoteEvent[]; absent?: boolean }>(

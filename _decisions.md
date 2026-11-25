@@ -9018,3 +9018,18 @@ Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir los commits de la rama; cada fase es un commit.
+
+## [2026-11-25] ADR-249 · En el móvil, una fecha se abre en el sitio (enmienda ADR-248 § 1 y § 3, ADR-247 y ADR-209)
+
+**Contexto.** Tras ADR-248, tocar una fecha en el móvil abría la pantalla de Día con «‹ Back» a media pantalla y la barra marcando Planner. Marco (25-11-2026): «¿por qué necesito un Back cuando voy a una fecha?»; le estresa una pantalla «a la que solo se llega desde donde se llega». Añadir vistas a Planner (Day, Board) es «una barbaridad». Su Month ya abría el día bajo su semana, pero con una línea fina y «DAY →» a otra pantalla. Láminas en la carpeta del proyecto `navegacion-movil/` (5 a 9); eligió la 9 («Ok, adelante con esto»).
+
+**Decisión.**
+1. **En el móvil no hay pantalla de Día.** Planner se queda con Agenda y Month. Una dirección `?view=day&d=` (las fichas de «Coming up» de Hoy) abre la vista de entrada de la persona (ADR-192; si no hay, la Agenda) con ese día abierto, y la dirección pasa a `?view=<vista>&d=<día>`.
+2. **Una fecha se abre en el sitio.** En Month, bajo su semana (`MonthGrid` `dayBody`/`pick`/`onPick`); en la Agenda, en lugar de la fila del día (`AgendaList` `openDay`/`dayBody`). El mismo bloque en los dos: un snippet de la página (`dayOpenCard`). Tocar otra vez la fecha lo pliega; tocar otro día lo cambia. Sin «fold», sin Back, sin «DAY →».
+3. **El bloque.** Tarjeta teñida sin borde (`--bg-box`, la de «Waiting for you») con el título del día, el «+» si se puede planificar, los choques, la tira de horas solo con dos cosas o más con hora, una caja blanca por cosa en una línea (`DayBox compact`: hora, monograma, qué · dónde; la franja oscura de la función como cabeza de su caja), las ausencias y las notas del día.
+4. **Elegir otra vista en la barra** empieza con el día cerrado (el Month vuelve a abrir hoy, como antes).
+5. **Escritorio no cambia**: el Día sigue siendo la lente de ADR-155.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`. Las notas del día abierto usan la misma consulta que el Día (`planner-day-notes`).
+
+**Cómo se revierte.** Revertir el commit.
