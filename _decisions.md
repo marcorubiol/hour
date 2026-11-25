@@ -9062,3 +9062,17 @@ Se borran `DayPiece` y los textos `planner.day_open`, `planner.day_set_hour` y `
 **Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
 
 **Cómo se revierte.** Revertir el commit.
+
+## [2026-11-25] ADR-252 · El día abierto: en Month bajo su día, en la Agenda a todo el ancho, y «todo el día» en vez de la raya (enmienda ADR-251 y ADR-249 § 3)
+
+**Contexto.** Marco, viendo ADR-251 desplegado (25-11-2026): en Month «cada tarjeta debería estar justo debajo de su día»; la raya de una cosa sin hora «queda fatal», «tenemos que poner all day»; en la Agenda la tarjeta no se acaba de ver: «las notas a la derecha y lo de esto a la izquierda para ocupar todo el ancho».
+
+**Decisión.**
+1. **Month (desde 48rem):** la tarjeta (36rem como mucho) se centra en la columna de su día y no sale de la semana: la de un lunes empieza en el borde izquierdo, la de un domingo acaba en el derecho, la de un día de en medio queda bajo él. `MonthGrid` da la columna (`--pick-col`).
+2. **Agenda (desde 48rem):** la tarjeta ocupa todo el ancho, en dos columnas: el día (cabecera, choques, tira de horas, cajas, ausencias) a la izquierda y notas y pasos (`DayFoot`) a la derecha (20rem).
+3. **Sin hora:** una fecha o un viaje sin hora es de todo el día (`all_day`) y su caja lo dice («todo el día», `planner.all_day`); una función sin hora sigue sin ella («sin hora»). La columna de la hora de `DayBox compact` pasa de 2.75rem a 3.5rem y admite dos líneas.
+4. En el móvil no cambia nada más que la palabra.
+
+**Sin cambios de datos.** Sin esquema, API ni `CACHE_SCHEMA`.
+
+**Cómo se revierte.** Revertir el commit.

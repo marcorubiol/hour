@@ -1818,7 +1818,10 @@
       return {
         o,
         hour: hourOfClock(clock),
-        at: clock ? hourMark(clock) : null,
+        // No hour: a date with none takes the whole day (Marco 25-11: «tenemos
+        // que poner all day, si no esa raya queda fatal»); a performance
+        // without one still lacks it.
+        at: clock ? hourMark(clock) : o.target === 'performance' ? null : t('planner.all_day', locale),
         what: o.target === 'performance' && city ? `${kind} · ${city}` : kind,
         sub:
           o.target === 'performance'
@@ -3656,6 +3659,7 @@
          fades in, so the change is seen (Marco 25-11: «un poco de animación»). -->
     {#key iso}
     <div class="dayopen" data-testid="day-open" data-day={iso} in:fade={DAY_FADE}>
+      <div class="dayopen__main">
       <div class="dayopen__head">
         <button
           type="button"
@@ -3732,6 +3736,8 @@
           <span class="away-line__who">{a.who}</span>{a.rest}
         </p>
       {/each}
+      </div>
+      <div class="dayopen__side">
       <DayFoot
         notes={dayNotes}
         canWrite={!dayNotesAbsent}
@@ -3747,6 +3753,7 @@
         placeholder={t('planner.note_placeholder', locale)}
         deleteLabel={t('planner.note_delete', locale)}
       />
+      </div>
     </div>
     {/key}
   {/snippet}
@@ -4299,13 +4306,35 @@
       border-radius: var(--radius-l);
       background: var(--bg-box);
     }
-    /* On a wider screen the card keeps a phone's reading width, centred
-       under its week or its row (ADR-251: «las tarjetas un poco más
-       estrechas, centradas»). */
+    .dayopen__main,
+    .dayopen__side {
+      display: grid;
+      gap: var(--space-xs);
+      align-content: start;
+      min-inline-size: 0;
+    }
     @media (min-width: 48rem) {
-      .dayopen {
-        max-inline-size: 36rem;
-        margin-inline: auto;
+      /* THE MONTH: the card hangs under ITS day (Marco 25-11: «cada tarjeta
+         debería estar justo debajo de su día»), a phone's reading width,
+         centred on the day's column and held inside the week: a Monday's
+         starts at the left edge, a Sunday's ends at the right. MonthGrid
+         says the column (`--pick-col`, 0 to 6). */
+      :global(.cal__pick--open) .dayopen {
+        --dayopen-w: min(36rem, 100%);
+        inline-size: var(--dayopen-w);
+        margin-inline-start: clamp(
+          0%,
+          calc((var(--pick-col, 3) + 0.5) * 100% / 7 - var(--dayopen-w) / 2),
+          calc(100% - var(--dayopen-w))
+        );
+      }
+      /* THE AGENDA: the whole width, the day's things on the left and its
+         notes and steps on the right (Marco 25-11: «las notas a la derecha y
+         lo de esto a la izquierda para ocupar todo el ancho»). */
+      :global(.ag__day--open) .dayopen {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+        column-gap: var(--space-l);
+        align-items: start;
       }
     }
     .dayopen__head {

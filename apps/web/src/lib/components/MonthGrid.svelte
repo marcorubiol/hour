@@ -1472,7 +1472,12 @@
       {@const list = pickedEntries(iso)}
       <!-- The picked day, whole, under its week (ADR-209). -->
       {#if dayBody}
-      <div class="cal__pick cal__pick--open" data-testid="month-pick" transition:slide|global={PICK_UNFOLD}>
+      <div
+        class="cal__pick cal__pick--open"
+        data-testid="month-pick"
+        style:--pick-col={week.findIndex((d) => d.iso === iso)}
+        transition:slide|global={PICK_UNFOLD}
+      >
         {@render dayBody(iso)}
       </div>
       {:else}
