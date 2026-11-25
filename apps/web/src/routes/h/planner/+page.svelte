@@ -680,6 +680,9 @@
     );
     for (const w of writes) void mutateJSON('PUT', '/api/me/planner-view', w).catch(() => {});
   }
+  // The Day's day, or (on a phone) the day open in place (ADR-249). Declared
+  // before the feeds: they read it while the page is being set up.
+  let selectedDay = $derived(view === 'day' ? (dayIso ?? todayIso) : (openDay ?? dayIso ?? todayIso));
   // ── Event feeds — the whole query layer lives in $lib/planner-feeds
   // (grid + team + decisions window + agenda book). Reactive inputs are
   // passed as getters so the option stores keep tracking this page's
@@ -1503,8 +1506,6 @@
   }
 
   // ── The Loom (Agrupa per Persona — ADR-080 §8) ────────────────────────
-  // The Day's day, or (on a phone) the day open in place (ADR-249).
-  let selectedDay = $derived(view === 'day' ? (dayIso ?? todayIso) : (openDay ?? dayIso ?? todayIso));
   /** Same normaliser the month uses — one shape for both primitives. */
   let slipCtxPage = $derived({
     workspaceSlug: defaultWorkspaceSlug,
