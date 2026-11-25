@@ -67,7 +67,7 @@
   {/if}
   <span class="dbox__in">
     <span class="dbox__at" class:dbox__at--none={at === null} title={at === null ? noHourWord : undefined}
-      >{at ?? '—'}</span
+      >{at ?? (compact ? noHourWord : '—')}</span
     >
     <span class="dbox__body">
       <span class="dbox__what" class:guess
@@ -183,13 +183,17 @@
       padding: calc(var(--space-xs) * 0.75) var(--space-s);
     }
     .dbox--compact .dbox__in {
-      grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+      grid-template-columns: 3.5rem minmax(0, 1fr) auto;
       gap: var(--space-xs);
       padding: var(--space-xs) var(--space-s);
       min-block-size: 2.5rem;
     }
+    /* «all day» / «todo el día» in place of an hour (25-11): two short lines
+       at most, never over the mark beside it. */
     .dbox--compact .dbox__at {
       font-size: var(--text-xs);
+      white-space: normal;
+      line-height: 1.15;
     }
     .dbox--compact .dbox__body {
       display: block;
