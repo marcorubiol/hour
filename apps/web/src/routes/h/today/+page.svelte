@@ -38,7 +38,7 @@
   import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
   import LateNoticeBand from '$lib/components/desk/LateNoticeBand.svelte';
   import { mobileReplyRows } from '$lib/mobile-replies';
-  import { COMING_COUNT_CAP, COMING_TILES, COMING_TILES_PHONE, COMING_TILES_WIDE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, visibleComingTiles, waitingRowCount } from '$lib/hoy';
+  import { COMING_COUNT_CAP, COMING_TILES, comingLimit, COMING_TILES_PHONE, COMING_TILES_WIDE, comingOpen, comingTiles, nextAfterToday, outsideToday, piecePerformance, scopePulseInput, visibleComingTiles, waitingRowCount } from '$lib/hoy';
   import { MediaQuery } from 'svelte/reactivity';
   import { MOBILE_QUERY, WIDE_QUERY } from '$lib/breakpoints';
   import { goto } from '$app/navigation';
@@ -245,8 +245,8 @@
    * pulse's own rows and order (`upcoming`), so the piece, the tiles and the
    * rail never disagree. An option to decide keeps its tile and its «?» even
    * when «Te espera» asks it too (ADR-203 § 10, amends ADR-154 § 4). On a
-   * phone, four tiles and then «Planner →»; the desktop column keeps ten
-   * (ADR-205).
+   * phone, three tiles and the Planner card; on a wide desktop, five and the
+   * card (ADR-250); the narrower desktop column keeps ten (ADR-205).
    */
   let coming = $derived(upcoming(pulseInput, clockNow, 40));
   // `phone` is declared further down: read it inside the closure.
@@ -262,10 +262,14 @@
   // keeps the window. The strip draws ten, four on a phone.
   let allTiles = $derived.by(() => comingTiles(upcoming(pulseInput, clockNow, COMING_COUNT_CAP), today, Infinity, listOf));
   let tilesOpen = $derived(comingOpen(allTiles));
+  /** The Planner card takes the grid's last cell (ADR-250): on a phone and on a
+      wide desktop, with the Planner lens on. `phone`/`wide` are declared
+      further down: read them inside the closure. */
+  const plannerCard = () => lensOn('planner') && (phone.current || wide.current);
   let tiles = $derived.by(() =>
     visibleComingTiles(
       allTiles,
-      phone.current ? COMING_TILES_PHONE : wide.current ? COMING_TILES_WIDE : COMING_TILES,
+      comingLimit(phone.current ? COMING_TILES_PHONE : wide.current ? COMING_TILES_WIDE : COMING_TILES, plannerCard()),
       wide.current ? tilesOpen.urgentDay : null,
     ),
   );
