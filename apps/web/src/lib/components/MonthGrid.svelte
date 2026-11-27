@@ -1475,7 +1475,6 @@
       <div
         class="cal__pick cal__pick--open"
         data-testid="month-pick"
-        style:--pick-col={week.findIndex((d) => d.iso === iso)}
         transition:slide|global={PICK_UNFOLD}
       >
         {@render dayBody(iso)}
